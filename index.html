@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Base64 工具</title>
 
-<!-- 🚀 这里引用本地文件，只要这两个js文件和这个html在同一目录，打包后绝不会报错 -->
-<script src="qrcode.min.js"></script>
-<script src="jsQR.min.js"></script>
+<!-- 🚀 使用国内高速 CDN，无需本地文件 -->
+<script src="https://cdn.staticfile.net/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.staticfile.net/jsqr/1.4.0/jsQR.min.js"></script>
 
 <!-- 拦截器 -->
 <script>
@@ -119,7 +119,7 @@
     <div class="tab-box" id="tab3">
       <div class="card">
         <h3 style="margin-bottom: 10px; font-size: 15px; color: #a5b4fc;">分享图片（扫码直接看原图）</h3>
-        <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">自动上传至国内免翻墙图床。</p>
+        <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">通过你的专属 Vercel 接口上传。</p>
         <button class="btn btn-orange" id="uploadQrBtn">🚀 上传图片并生成短链二维码</button>
         <input type="file" id="uploadImgInput" accept="image/*" style="display: none;">
         
@@ -157,13 +157,12 @@
 <script>
   window.onload = function() {
     if(typeof QRCode === 'undefined' || typeof jsQR === 'undefined') {
-      alert("本地JS库加载失败！请确保qrcode.min.js和jsQR.min.js文件已放在此HTML所在的文件夹里！");
+      alert("外部库加载失败！请确保手机网络通畅，或者尝试更换网络。");
     }
     switchTab(0);
     document.getElementById('dropzone').style.display = 'block';
     document.getElementById('resultArea').style.display = 'none';
     
-    // 启动剪贴板监控
     checkClipboard();
   };
 
@@ -179,7 +178,6 @@
     document.querySelectorAll('.nav-item').forEach((el, i) => el.className = i === index ? 'nav-item active' : 'nav-item');
   }
 
-  // RLE 压缩与解压
   function rleCompress(str) {
     return str.replace(/(.)\1{3,}/g, function(match, char) {
       return '#' + char + match.length + '#';
@@ -212,7 +210,6 @@
     testImg.src = dataUrl;
   }
 
-  // 全自动剪贴板监听
   let lastClipboardText = '';
   async function checkClipboard() {
     try {
@@ -288,21 +285,21 @@
     const a = document.createElement('a'); a.href = document.getElementById('outputImg').src; a.download = 'image.png'; a.click();
   };
 
+  // 🚀 核心：修改为你的专属 Vercel 接口，使用 Punycode 防乱码
   document.getElementById('uploadQrBtn').onclick = () => document.getElementById('uploadImgInput').click();
-document.getElementById('uploadImgInput').onchange = async function(e) {
+  document.getElementById('uploadImgInput').onchange = async function(e) {
     if (!e.target.files[0]) return;
     const file = e.target.files[0];
     const statusText = document.getElementById('uploadStatus');
     statusText.style.display = 'block';
-    statusText.textContent = '正在通过你的专属通道上传...';
+    statusText.textContent = '正在上传...';
     
     const reader = new FileReader();
     reader.onload = async function(event) {
       const base64Data = event.target.result;
       
       try {
-        // 🚀 换成你的专属 API
-        const res = await fetch('https://base六四.new.tg/api/upload', {
+        const res = await fetch('https://xn--base-yt8fr10a.new.tg/api/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageBase64: base64Data })
@@ -312,10 +309,10 @@ document.getElementById('uploadImgInput').onchange = async function(e) {
         
         if (data.url) {
           statusText.textContent = '上传成功！';
-          renderQrCode(data.url); // 拿到短链接，生成二维码
-          toast('上传成功，扫码即可看图！', true);
+          renderQrCode(data.url);
+          toast('上传成功，扫码看图！', true);
         } else {
-          statusText.textContent = '图床繁忙，请稍后再试。';
+          statusText.textContent = '上传失败，请尝试离线压缩。';
           toast('上传失败');
         }
       } catch (err) {
@@ -325,7 +322,7 @@ document.getElementById('uploadImgInput').onchange = async function(e) {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
-};
+  };
 
   document.getElementById('compressQrBtn').onclick = () => document.getElementById('compressImgInput').click();
   document.getElementById('compressImgInput').onchange = function(e) {
@@ -403,7 +400,7 @@ document.getElementById('uploadImgInput').onchange = async function(e) {
           document.getElementById('qrResultText').value = code.data;
           document.getElementById('b64Input').value = code.data;
           decodeAndRender(code.data);
-          toast('识别成功，已自动尝试出图！', true);
+          toast('识别成功！', true);
         } else {
           toast('未能识别，请换张清晰的图');
         }
@@ -411,6 +408,14 @@ document.getElementById('uploadImgInput').onchange = async function(e) {
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+  };
+
+  document.getElementById('scanToB64Btn').onclick = () => {
+    const text = document.getElementById('qrResultText').value.trim();
+    if (!text) return;
+    document.getElementById('b64Input').value = text;
+    decodeAndRender(text);
+    switchTab(1);
   };
 </script>
 </body>
