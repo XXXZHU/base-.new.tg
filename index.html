@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Base64 工具</title>
+
+<!-- 🚀 这里引用本地文件，只要这两个js文件和这个html在同一目录，打包后绝不会报错 -->
+<script src="qrcode.min.js"></script>
+<script src="jsQR.min.js"></script>
+
+<!-- 拦截器 -->
+<script>
+  window._shareImg = null;
+  window._lastProcessedImg = null;
+  window.addEventListener('wta:share', function(e) {
+    try {
+      if (!e || !e.detail) return;
+      let raw = typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail);
+      let match = raw.match(/"dataUrl":"(data:image\/[^"]+)"/);
+      if (match && match[1]) {
+        let imgData = match[1].replace(/\\/g, '');
+        if (imgData !== window._lastProcessedImg) {
+            window._shareImg = imgData;
+            if (typeof renderShare === 'function') renderShare();
+        }
+      }
+    } catch(err) {}
+  });
+</script>
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; font-family: sans-serif; background: #0f1419; color: #e8e8e8; }
+  input, textarea { user-select: text; outline: none; }
+
+  .watermark { position: absolute; font-size: 12px; color: rgba(255, 255, 255, 0.1); z-index: 999; pointer-events: none; letter-spacing: 1px; font-weight: bold; }
+  .wm-1 { bottom: 70px; right: 15px; }
+  .wm-2 { bottom: 70px; left: 15px; }
+
+  #app { display: flex; flex-direction: column; height: 100%; position: relative; z-index: 1; }
+  .header { padding: 20px; border-bottom: 1px solid #1a1f26; display: flex; justify-content: space-between; align-items: center;}
+  .header h1 { font-size: 20px; color: #667eea; }
+  .clipboard-status { font-size: 12px; color: #22c55e; display: none; animation: pulse 1.5s infinite; }
+
+  @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+  .content { flex: 1; overflow-y: auto; padding: 20px; }
+  
+  .tab-box { display: none; }
+  .tab-box.active { display: block; }
+
+  .card { background: #1a1f26; border-radius: 10px; padding: 15px; margin-bottom: 15px; }
+  
+  .dropzone { border: 2px dashed #2d3540; border-radius: 8px; padding: 30px; text-align: center; color: #9ca3af; cursor: pointer; }
+  
+  .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; color: #fff; margin-top: 10px; cursor: pointer; }
+  .btn-blue { background: #667eea; }
+  .btn-green { background: #22c55e; }
+  .btn-orange { background: #f59e0b; }
+  .btn-gray { background: #2d3540; }
+
+  textarea { width: 100%; height: 120px; background: #0f1419; border: 1px solid #2d3540; border-radius: 8px; color: #fff; padding: 10px; margin-top: 10px; font-family: monospace; resize: none; }
+  
+  .preview { text-align: center; margin-bottom: 10px; }
+  .preview img { max-width: 100%; max-height: 200px; border-radius: 5px; }
+
+  .nav { display: flex; background: #1a1f26; border-top: 1px solid #2d3540; }
+  .nav-item { flex: 1; padding: 15px 0; text-align: center; color: #6b7280; font-size: 13px; cursor: pointer;}
+  .nav-item.active { color: #667eea; font-weight: bold; }
+
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #ef4444; color: #fff; padding: 10px 20px; border-radius: 20px; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 10000; font-size: 14px; text-align: center; width: 80%; max-width: 300px; line-height: 1.5; }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #22c55e; }
+
+  #qrcode-container { display: none; margin-top: 15px; padding: 15px; background: #fff; border-radius: 8px; width: 230px; height: 230px; margin-left: auto; margin-right: auto; }
+  #qrcode-container img, #qrcode-container canvas { width: 200px !important; height: 200px !important; display: block; margin: 0 auto; } 
+</style>
+</head>
+<body>
+
+<div class="watermark wm-1">@xxxzhuuu</div>
+<div class="watermark wm-2">@xxxzhuuu</div>
+
+<div id="app">
+  <div class="header">
+    <h1>Base64 工具</h1>
+    <div class="clipboard-status" id="clipStatus">📋 发现剪贴板内容，正在解析...</div>
+  </div>
+
+  <div class="content">
+    <div class="tab-box active" id="tab1">
+      <div class="card">
+        <div class="dropzone" id="dropzone">
+          📁 点击选择图片
+          <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        </div>
+        <div id="resultArea" style="display: none;">
+          <div class="preview"><img id="previewImg"></div>
+          <textarea id="b64Output" readonly></textarea>
+          <button class="btn btn-blue" id="copyB64">📋 复制 Base64</button>
+          <button class="btn btn-gray" id="reset1">重新选择</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-box" id="tab2">
+      <div class="card">
+        <button class="btn btn-green" id="pasteBtn">📋 从剪贴板读取并出图</button>
+        <textarea id="b64Input" placeholder="粘贴内容... (或者复制后直接切回APP，会自动识别)"></textarea>
+        <button class="btn btn-blue" id="decodeBtn">手动转换为图片</button>
+        <div id="imgOutArea" style="display: none; margin-top: 15px;">
+          <div class="preview"><img id="outputImg"></div>
+          <button class="btn btn-green" id="downloadImg">下载图片</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-box" id="tab3">
+      <div class="card">
+        <h3 style="margin-bottom: 10px; font-size: 15px; color: #a5b4fc;">分享图片（扫码直接看原图）</h3>
+        <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">自动上传至国内免翻墙图床。</p>
+        <button class="btn btn-orange" id="uploadQrBtn">🚀 上传图片并生成短链二维码</button>
+        <input type="file" id="uploadImgInput" accept="image/*" style="display: none;">
+        
+        <div id="uploadStatus" style="display:none; text-align:center; font-size:12px; color:#a5b4fc; margin-top:10px;"></div>
+        
+        <div id="qrcode-container"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-bottom: 10px; font-size: 15px; color: #a5b4fc;">离线压缩生成</h3>
+        <p style="font-size: 12px; color: #9ca3af; margin-bottom: 10px;">如果图床失败，可尝试离线极限压缩。</p>
+        <button class="btn btn-gray" id="compressQrBtn">🔥 离线压缩图生成</button>
+        <input type="file" id="compressImgInput" accept="image/*" style="display: none;">
+      </div>
+
+      <div class="card">
+        <h3 style="margin-bottom: 10px; font-size: 15px; color: #a5b4fc;">识别二维码</h3>
+        <button class="btn btn-green" id="scanQrBtn">📷 识别图片中的二维码</button>
+        <input type="file" id="qrFileInput" accept="image/*" style="display: none;">
+        <textarea id="qrResultText" placeholder="识别结果..." style="height: 80px; margin-top: 10px;"></textarea>
+        <button class="btn btn-blue" id="scanToB64Btn" style="margin-top: 10px;">将识别结果转为图片</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-item active" onclick="switchTab(0)">📸 图片转码</div>
+    <div class="nav-item" onclick="switchTab(1)">✨ Base64出图</div>
+    <div class="nav-item" onclick="switchTab(2)">🔳 二维码</div>
+  </div>
+</div>
+
+<div class="toast" id="toast">提示</div>
+
+<script>
+  window.onload = function() {
+    if(typeof QRCode === 'undefined' || typeof jsQR === 'undefined') {
+      alert("本地JS库加载失败！请确保qrcode.min.js和jsQR.min.js文件已放在此HTML所在的文件夹里！");
+    }
+    switchTab(0);
+    document.getElementById('dropzone').style.display = 'block';
+    document.getElementById('resultArea').style.display = 'none';
+    
+    // 启动剪贴板监控
+    checkClipboard();
+  };
+
+  function toast(msg, isSuccess = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isSuccess ? ' success' : '');
+    setTimeout(() => t.className = 'toast', 3000);
+  }
+
+  function switchTab(index) {
+    document.querySelectorAll('.tab-box').forEach((el, i) => el.className = i === index ? 'tab-box active' : 'tab-box');
+    document.querySelectorAll('.nav-item').forEach((el, i) => el.className = i === index ? 'nav-item active' : 'nav-item');
+  }
+
+  // RLE 压缩与解压
+  function rleCompress(str) {
+    return str.replace(/(.)\1{3,}/g, function(match, char) {
+      return '#' + char + match.length + '#';
+    });
+  }
+  function rleDecompress(str) {
+    return str.replace(/#(.)(\d+)#/g, function(match, char, count) {
+      return char.repeat(parseInt(count));
+    });
+  }
+
+  function decodeAndRender(raw) {
+    if(!raw) return;
+    if (raw.includes('#')) {
+       toast('检测到压缩编码，正在解压...');
+       raw = rleDecompress(raw);
+    }
+    let dataUrl = raw.startsWith('data:image/') ? raw : 'data:image/png;base64,' + raw.replace(/\s/g, '');
+    
+    const testImg = new Image();
+    testImg.onload = () => {
+      document.getElementById('outputImg').src = dataUrl;
+      document.getElementById('imgOutArea').style.display = 'block';
+      switchTab(1);
+      toast('出图成功', true);
+    };
+    testImg.onerror = () => {
+      toast('无法解析内容为图片，请检查是否完整复制');
+    };
+    testImg.src = dataUrl;
+  }
+
+  // 全自动剪贴板监听
+  let lastClipboardText = '';
+  async function checkClipboard() {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) return;
+      const text = await navigator.clipboard.readText();
+      
+      if (text && text !== lastClipboardText && text.length > 50) {
+        lastClipboardText = text;
+        const statusEl = document.getElementById('clipStatus');
+        statusEl.style.display = 'block';
+        
+        setTimeout(() => {
+          statusEl.style.display = 'none';
+          document.getElementById('b64Input').value = text;
+          decodeAndRender(text);
+        }, 500);
+      }
+    } catch (e) {}
+  }
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      checkClipboard();
+    }
+  });
+
+  function renderShare() {
+    if (!window._shareImg) return;
+    switchTab(0);
+    const pure = window._shareImg.split(',')[1] || window._shareImg;
+    document.getElementById('previewImg').src = window._shareImg;
+    document.getElementById('b64Output').value = pure;
+    document.getElementById('dropzone').style.display = 'none';
+    document.getElementById('resultArea').style.display = 'block';
+    toast('已接收分享的图片！', true);
+    window._lastProcessedImg = window._shareImg; 
+    window._shareImg = null; 
+  }
+
+  document.getElementById('dropzone').onclick = () => document.getElementById('fileInput').click();
+  document.getElementById('fileInput').onchange = function(e) {
+    if (!e.target.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      window._shareImg = ev.target.result;
+      renderShare();
+    };
+    reader.readAsDataURL(e.target.files[0]);
+  };
+
+  document.getElementById('copyB64').onclick = () => {
+    navigator.clipboard.writeText(document.getElementById('b64Output').value);
+    toast('已复制到剪贴板', true);
+  };
+  
+  document.getElementById('reset1').onclick = () => {
+    document.getElementById('dropzone').style.display = 'block';
+    document.getElementById('resultArea').style.display = 'none';
+    window._lastProcessedImg = null;
+  };
+
+  document.getElementById('pasteBtn').onclick = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      document.getElementById('b64Input').value = text;
+      decodeAndRender(text);
+    } catch(e) { toast('请长按粘贴'); }
+  };
+  
+  document.getElementById('decodeBtn').onclick = () => decodeAndRender(document.getElementById('b64Input').value);
+  
+  document.getElementById('downloadImg').onclick = () => {
+    const a = document.createElement('a'); a.href = document.getElementById('outputImg').src; a.download = 'image.png'; a.click();
+  };
+
+  document.getElementById('uploadQrBtn').onclick = () => document.getElementById('uploadImgInput').click();
+document.getElementById('uploadImgInput').onchange = async function(e) {
+    if (!e.target.files[0]) return;
+    const file = e.target.files[0];
+    const statusText = document.getElementById('uploadStatus');
+    statusText.style.display = 'block';
+    statusText.textContent = '正在通过你的专属通道上传...';
+    
+    const reader = new FileReader();
+    reader.onload = async function(event) {
+      const base64Data = event.target.result;
+      
+      try {
+        // 🚀 换成你的专属 API
+        const res = await fetch('https://base六四.new.tg/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64Data })
+        });
+        
+        const data = await res.json();
+        
+        if (data.url) {
+          statusText.textContent = '上传成功！';
+          renderQrCode(data.url); // 拿到短链接，生成二维码
+          toast('上传成功，扫码即可看图！', true);
+        } else {
+          statusText.textContent = '图床繁忙，请稍后再试。';
+          toast('上传失败');
+        }
+      } catch (err) {
+        statusText.textContent = '网络错误，请检查连接。';
+        toast('请求失败！');
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+};
+
+  document.getElementById('compressQrBtn').onclick = () => document.getElementById('compressImgInput').click();
+  document.getElementById('compressImgInput').onchange = function(e) {
+    if (!e.target.files[0]) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width = img.width, height = img.height;
+        const maxSize = 160; 
+        if (width > height) {
+          if (width > maxSize) { height *= maxSize / width; width = maxSize; }
+        } else {
+          if (height > maxSize) { width *= maxSize / height; height = maxSize; }
+        }
+        
+        canvas.width = width; canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        let originalBase64 = canvas.toDataURL('image/jpeg', 0.3);
+        renderQrCode(rleCompress(originalBase64));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ''; 
+  };
+
+  function renderQrCode(text) {
+    const container = document.getElementById('qrcode-container');
+    container.innerHTML = ''; 
+    container.style.display = 'block'; 
+
+    if (text.length > 1500) {
+       container.style.display = 'none';
+       toast('二维码装不下，图片太大了。');
+       return;
+    }
+
+    try {
+      new QRCode(container, {
+        text: text, width: 200, height: 200,
+        colorDark : "#000000", colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.L
+      });
+    } catch(e) {
+      container.style.display = 'none';
+      toast('生成失败');
+    }
+  }
+
+  document.getElementById('scanQrBtn').onclick = () => document.getElementById('qrFileInput').click();
+  document.getElementById('qrFileInput').onchange = function(e) {
+    if (!e.target.files[0]) return;
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    
+    reader.onload = function(event) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width; canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+        
+        if (code) {
+          document.getElementById('qrResultText').value = code.data;
+          document.getElementById('b64Input').value = code.data;
+          decodeAndRender(code.data);
+          toast('识别成功，已自动尝试出图！', true);
+        } else {
+          toast('未能识别，请换张清晰的图');
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+</script>
+</body>
+</html>
