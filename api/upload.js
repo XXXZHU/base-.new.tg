@@ -12,23 +12,24 @@ module.exports = async (req, res) => {
     if (!imageBase64) return res.status(400).json({ error: '没有收到图片数据' });
 
     const base64Data = imageBase64.split(',')[1];
-    
-    // 使用 FormData 发送给 imgbb
-    const form = new FormData();
-    form.append('image', base64Data);
+    const buffer = Buffer.from(base64Data, 'base64');
 
-    // 🚀 请求 imgbb 免费图床（无需 API Key 的公共上传接口）
-    const response = await axios.post('https://imgbb.com/json', form, {
+    const form = new FormData();
+    form.append('file', buffer, { filename: 'image.jpg' });
+
+    // 🚀 使用 0x0.st 图床，极客专属，抗封锁能力极强
+    const response = await axios.post('https://0x0.st', form, {
       headers: { 
         ...form.getHeaders(),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'User-Agent': 'Mozilla/5.0'
       }
     });
 
-    if (response.data && response.data.image && response.data.image.url) {
-      return res.status(200).json({ url: response.data.image.url });
+    // 0x0.st 返回的是一串纯文本网址
+    if (response.data && response.data.startsWith('http')) {
+      return res.status(200).json({ url: response.data.trim() });
     } else {
-      return res.status(500).json({ error: '图床解析失败', details: response.data });
+      return res.status(500).json({ error: '图床解析失败' });
     }
   } catch (error) {
     return res.status(500).json({ error: '代理请求失败：' + error.message });
