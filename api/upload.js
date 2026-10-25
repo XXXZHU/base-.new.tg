@@ -1,5 +1,5 @@
-export default async function handler(req, res) {
-  // 1. 放行跨域限制
+module.exports = async (req, res) => {
+  // 设置跨域
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -14,30 +14,30 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: '没有收到图片数据' });
     }
 
-    // 2. 解析 Base64
     const base64Data = imageBase64.split(',')[1];
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // 3. 打包发给外网图床 (SM.MS)
+    // Telegra.ph 需要 form-data
     const formData = new FormData();
     const blob = new Blob([buffer], { type: 'image/jpeg' });
-    formData.append('smfile', blob, 'image.jpg');
+    formData.append('file', blob, 'image.jpg'); // 这里字段名必须是 file
 
-    // 4. Vercel 服务器替你发送请求
-    const response = await fetch('https://sm.ms/api/v2/upload', {
+    // 🚀 请求 Telegra.ph 图床
+    const response = await fetch('https://telegra.ph/upload', {
       method: 'POST',
       body: formData
     });
 
     const data = await response.json();
 
-    // 5. 把短链接还给你的 App
-    if (data.success) {
-      return res.status(200).json({ url: data.data.url });
+    if (data && data[0] && data[0].src) {
+      // Telegra.ph 返回的是相对路径，需要拼接完整域名
+      const url = 'https://telegra.ph' + data[0].src;
+      return res.status(200).json({ url: url });
     } else {
-      return res.status(500).json({ error: '图床繁忙，稍后再试' });
+      return res.status(500).json({ error: '图床返回异常', details: data });
     }
   } catch (error) {
     return res.status(500).json({ error: '代理请求失败：' + error.message });
   }
-}
+};
