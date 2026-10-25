@@ -63,7 +63,64 @@
   .preview { text-align: center; margin-bottom: 10px; }
   .preview img { max-width: 100%; max-height: 200px; border-radius: 5px; }
 
-  .nav { display: flex; background: #1a1f26; border-top: 1px solid #2d3540; }
+  /* ========== 液态玻璃 Dock 栏 ========== */
+.nav {
+  display: flex;
+  position: relative; /* 为高光伪元素做定位 */
+  
+  /* 核心1：半透明底色。如果不支持模糊，这个颜色会作为纯色背景 */
+  background-color: rgba(26, 31, 38, 0.85); 
+  
+  /* 核心2：边缘微光。顶部加一条极细的半透明白边，模拟玻璃反光 */
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  
+  /* 核心3：底部的深邃阴影，让导航栏感觉是“浮”在页面上的 */
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+  
+  /* 开启硬件加速，防止在 WebView 里滚动时卡顿 */
+  transform: translateZ(0);
+  
+  z-index: 100; /* 确保导航栏在最上层 */
+}
+
+/* 支持 backdrop-filter 的浏览器（现代安卓 WebView）会应用这个魔法 */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .nav {
+    /* 更低透明度的背景，配合模糊效果 */
+    background-color: rgba(26, 31, 38, 0.6); 
+    
+    /* 🚀 真正的液态玻璃灵魂：背景模糊 + 饱和度增强 */
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+}
+
+/* 高光反射层：在顶部生成一道微弱的渐变高光，增加液体的流动感 */
+.nav::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15) 50%, transparent);
+  pointer-events: none;
+}
+
+.nav-item {
+  flex: 1; 
+  padding: 15px 0; 
+  text-align: center; 
+  color: #6b7280; 
+  font-size: 13px; 
+  cursor: pointer;
+  transition: all 0.3s ease; /* 增加点击时的过渡动画 */
+}
+
+/* 选中态的文字和图标增加一点微微的发光效果 */
+.nav-item.active { 
+  color: #667eea; 
+  font-weight: bold; 
+  text-shadow: 0 0 10px rgba(102, 126, 234, 0.4); 
+}
   .nav-item { flex: 1; padding: 15px 0; text-align: center; color: #6b7280; font-size: 13px; cursor: pointer;}
   .nav-item.active { color: #667eea; font-weight: bold; }
 
