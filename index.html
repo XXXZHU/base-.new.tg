@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Base64 工具</title>
 
-<!-- 🚀 使用国内高速 CDN，无需本地文件 -->
-<script src="https://cdn.staticfile.net/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.staticfile.net/jsqr/1.4.0/jsQR.min.js"></script>
+<!-- 🚀 使用 BootCDN（国内极速） -->
+<script src="https://cdn.bootcdn.net/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 
 <!-- 拦截器 -->
 <script>
@@ -162,7 +162,6 @@
     switchTab(0);
     document.getElementById('dropzone').style.display = 'block';
     document.getElementById('resultArea').style.display = 'none';
-    
     checkClipboard();
   };
 
@@ -215,12 +214,10 @@
     try {
       if (!navigator.clipboard || !navigator.clipboard.readText) return;
       const text = await navigator.clipboard.readText();
-      
       if (text && text !== lastClipboardText && text.length > 50) {
         lastClipboardText = text;
         const statusEl = document.getElementById('clipStatus');
         statusEl.style.display = 'block';
-        
         setTimeout(() => {
           statusEl.style.display = 'none';
           document.getElementById('b64Input').value = text;
@@ -231,9 +228,7 @@
   }
 
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') {
-      checkClipboard();
-    }
+    if (document.visibilityState === 'visible') checkClipboard();
   });
 
   function renderShare() {
@@ -285,7 +280,6 @@
     const a = document.createElement('a'); a.href = document.getElementById('outputImg').src; a.download = 'image.png'; a.click();
   };
 
-  // 🚀 核心：修改为你的专属 Vercel 接口，使用 Punycode 防乱码
   document.getElementById('uploadQrBtn').onclick = () => document.getElementById('uploadImgInput').click();
   document.getElementById('uploadImgInput').onchange = async function(e) {
     if (!e.target.files[0]) return;
@@ -297,7 +291,6 @@
     const reader = new FileReader();
     reader.onload = async function(event) {
       const base64Data = event.target.result;
-      
       try {
         const res = await fetch('https://xn--base-yt8fr10a.new.tg/api/upload', {
           method: 'POST',
@@ -360,13 +353,11 @@
     const container = document.getElementById('qrcode-container');
     container.innerHTML = ''; 
     container.style.display = 'block'; 
-
     if (text.length > 1500) {
        container.style.display = 'none';
        toast('二维码装不下，图片太大了。');
        return;
     }
-
     try {
       new QRCode(container, {
         text: text, width: 200, height: 200,
