@@ -1,3 +1,6 @@
+const axios = require('axios');
+const FormData = require('form-data');
+
 module.exports = async (req, res) => {
   // 设置跨域
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,21 +20,16 @@ module.exports = async (req, res) => {
     const base64Data = imageBase64.split(',')[1];
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Telegra.ph 需要 form-data
-    const formData = new FormData();
-    const blob = new Blob([buffer], { type: 'image/jpeg' });
-    formData.append('file', blob, 'image.jpg'); // 这里字段名必须是 file
+    const form = new FormData();
+    form.append('file', buffer, { filename: 'image.jpg', contentType: 'image/jpeg' });
 
-    // 🚀 请求 Telegra.ph 图床
-    const response = await fetch('https://telegra.ph/upload', {
-      method: 'POST',
-      body: formData
+    // 🚀 使用 axios 请求 Telegra.ph 图床，比原生 fetch 稳一万倍
+    const response = await axios.post('https://telegra.ph/upload', form, {
+      headers: { ...form.getHeaders() }
     });
 
-    const data = await response.json();
-
+    const data = response.data;
     if (data && data[0] && data[0].src) {
-      // Telegra.ph 返回的是相对路径，需要拼接完整域名
       const url = 'https://telegra.ph' + data[0].src;
       return res.status(200).json({ url: url });
     } else {
